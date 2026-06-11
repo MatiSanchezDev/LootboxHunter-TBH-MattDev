@@ -1,0 +1,15 @@
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+
+# App local data (por las dudas, no deberia estar en el repo)
+config.json
+
+# Tooling / agentes (no es parte del proyecto)
+.atl/
+.claude/
