@@ -1,7 +1,9 @@
 # PyInstaller
 build/
 dist/
+dist_onedir/
 *.spec
+*.zip
 
 # Python
 __pycache__/

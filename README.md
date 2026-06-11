@@ -17,7 +17,35 @@ so you always know which map is ready next.
 That single link downloads the app directly. Then **double-click it** — no
 installation, no Python, nothing else to set up. (Windows only.)
 
+Prefer fewer antivirus warnings? Grab **`LootboxHunter-portable.zip`** from the
+[Releases](../../releases) page, unzip it, and run `LootboxHunter.exe` inside.
+
 ⭐ If this saves you time, please **star the repo** — it really helps!
+
+## 🛡️ Is it safe? (antivirus false positive)
+
+**Yes.** Some antivirus engines may flag the `.exe` as a generic
+"Trojan"/"Wacatac"/"ML.Heuristic". This is a **known false positive for apps
+built with PyInstaller** — not actual malware.
+
+Why it happens:
+
+- A `--onefile` PyInstaller app bundles the Python runtime and **unpacks itself
+  to a temp folder at launch**. Packed malware does the same thing, so heuristic
+  scanners flag the *pattern*, not real malicious code.
+- The executable is **unsigned** (no paid code-signing certificate) and brand
+  new, so it has zero reputation.
+
+How you can verify it yourself:
+
+- **The full source is in this repo** — read every line. The app only uses the
+  Python standard library. No `requests`, no `socket`, no `subprocess`, no
+  remote code. It only opens this GitHub page in your browser (the ⭐ link) and
+  saves settings to `%APPDATA%\CofreTracker\config.json`.
+- **Run it from source** with `python cofre_tracker.py` — no `.exe` at all.
+- **Build it yourself** (see below) and you'll get the same harmless file.
+- Prefer the **portable .zip** (`--onedir` build), which doesn't self-extract and
+  usually triggers fewer warnings.
 
 ---
 
@@ -63,11 +91,14 @@ python cofre_tracker.py
 ### Build your own .exe
 
 ```bash
-python -m pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name LootboxHunter cofre_tracker.py
-```
+python -m pip install pyinstaller pillow
 
-The executable lands in `dist/LootboxHunter.exe`.
+# Single-file build → dist/LootboxHunter.exe
+python -m PyInstaller --onefile --windowed --name LootboxHunter --icon icono.ico --add-data "icono.png;." cofre_tracker.py
+
+# Folder build (fewer antivirus false positives) → dist/LootboxHunter/
+python -m PyInstaller --onedir --windowed --name LootboxHunter --icon icono.ico --add-data "icono.png;." cofre_tracker.py
+```
 
 ---
 
