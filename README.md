@@ -29,8 +29,13 @@ so you always know which map is ready next.
 
 ### Option A — Download the .exe (recommended, no Python needed)
 
-1. Go to the [**Releases**](../../releases) page and download `LootboxHunter.exe`.
-2. Double-click it. That's it.
+Grab the ready-to-run executable, **double-click it, done**. Two ways:
+
+- Download [**`LootboxHunter.exe`**](LootboxHunter.exe) straight from this repo
+  (click the file, then the download button), **or**
+- Get it from the [**Releases**](../../releases) page.
+
+No installation, no Python required.
 
 > **Windows SmartScreen** may warn the first time (the app isn't code-signed).
 > Click **More info → Run anyway**. The code is open here for you to inspect.
