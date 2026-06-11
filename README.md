@@ -1,5 +1,7 @@
 # LootboxHunter — TBH (Taskbar Hero)
 
+<p align="center"><img src="icono.png" width="96" alt="LootboxHunter icon"></p>
+
 A tiny, dependency-free Windows app to track **chest cooldown timers** across
 multiple maps in *Taskbar Hero*. Mark a map as **Dropped** the moment you get a
 chest and the app rings when its cooldown is up — for each map independently —
@@ -7,6 +9,13 @@ so you always know which map is ready next.
 
 > Built with plain Python (Tkinter + winsound). No internet, no telemetry,
 > everything is stored locally on your PC.
+
+## ⬇️ Download (just the app)
+
+**[➡️ CLICK HERE TO DOWNLOAD LootboxHunter.exe ⬅️](https://github.com/MatiSanchezDev/LootboxHunter-TBH-MattDev/raw/main/LootboxHunter.exe)**
+
+That single link downloads the app directly. Then **double-click it** — no
+installation, no Python, nothing else to set up. (Windows only.)
 
 ⭐ If this saves you time, please **star the repo** — it really helps!
 

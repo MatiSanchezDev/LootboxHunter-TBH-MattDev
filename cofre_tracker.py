@@ -4,17 +4,23 @@ LootboxHunter - TBH (Taskbar Hero)
 
 Multi-map chest cooldown tracker. Mark "Dropped" when you get a chest and
 the app rings when the configured minutes are up, per map. Includes map
-suggestions, difficulty badges, a completed-cycles counter, multi-language
-UI and a built-in manual. Everything is saved locally.
+suggestions, difficulty badges, a completed-cycles counter, an adjustable
+volume, multi-language UI and a built-in manual. Everything is saved locally.
 
 No external dependencies: standard Python only (tkinter + winsound).
 """
 
+import io
 import json
 import locale
+import math
 import os
+import re
+import struct
+import sys
 import threading
 import time
+import wave
 import webbrowser
 import tkinter as tk
 from tkinter import ttk
@@ -31,23 +37,31 @@ except Exception:  # noqa: BLE001  (en caso de correr fuera de Windows)
 GITHUB_USER = "MatiSanchezDev"
 REPO_NAME = "LootboxHunter-TBH-MattDev"
 GITHUB_URL = f"https://github.com/{GITHUB_USER}/{REPO_NAME}"
+DOWNLOAD_URL = f"https://github.com/{GITHUB_USER}/{REPO_NAME}/raw/main/LootboxHunter.exe"
 
 APP_TITLE = "LootboxHunter - TBH"
+ICON_FILE = "icono.png"
+
+
+def resource_path(rel):
+    """Ruta a un recurso, funciona tanto en script como en .exe (PyInstaller)."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, rel)
 
 
 # ------------------------------------------------------------- Sugerencias
-# (Mapa, Cofre, Dificultad)
+# (Mapa, Nivel del cofre, Dificultad). "Cofre Azul" se traduce en runtime.
 SUGGESTIONS = [
-    ("Stage 1 - 1", "Cofre Azul Lv01", "Normal"),
-    ("Stage 1 - 4", "Cofre Azul Lv02", "Normal"),
-    ("Stage 1 - 8", "Cofre Azul Lv03", "Normal"),
-    ("Stage 2 - 3", "Cofre Azul Lv15", "Normal"),
-    ("Stage 2 - 8", "Cofre Azul Lv20", "Normal"),
-    ("Stage 3 - 8", "Cofre Azul Lv30", "Normal"),
-    ("Stage 1 - 9", "Cofre Azul Lv40", "Nightmare"),
-    ("Stage 3 - 5", "Cofre Azul Lv50", "Nightmare"),
-    ("Stage 2 - 5", "Cofre Azul Lv65", "Hell"),
-    ("Stage 1 - 3", "Cofre Azul Lv80", "Torment"),
+    ("Stage 1 - 1", "Lv01", "Normal"),
+    ("Stage 1 - 4", "Lv02", "Normal"),
+    ("Stage 1 - 8", "Lv03", "Normal"),
+    ("Stage 2 - 3", "Lv15", "Normal"),
+    ("Stage 2 - 8", "Lv20", "Normal"),
+    ("Stage 3 - 8", "Lv30", "Normal"),
+    ("Stage 1 - 9", "Lv40", "Nightmare"),
+    ("Stage 3 - 5", "Lv50", "Nightmare"),
+    ("Stage 2 - 5", "Lv65", "Hell"),
+    ("Stage 1 - 3", "Lv80", "Torment"),
 ]
 
 DIFFICULTIES = ["Normal", "Nightmare", "Hell", "Torment"]
@@ -70,10 +84,11 @@ TR = {
     "en": {
         "add_map": "+ Add map", "map_name": "Map name", "difficulty": "Difficulty",
         "suggestions": "Suggestions", "add": "Add", "minutes": "Minutes per chest:",
-        "mute": "Mute", "language": "Language", "manual": "Manual",
+        "mute": "Mute", "volume": "Volume", "language": "Language", "manual": "Manual",
         "dropped": "Dropped", "reset": "Reset", "idle": "Not counting",
         "counting": "Counting...", "ready_status": "Chest available",
-        "ready": "READY", "no_maps": "No maps yet.\nAdd one above or pick a suggestion.",
+        "ready": "READY", "blue_chest": "Blue Chest",
+        "no_maps": "No maps yet.\nAdd one above or pick a suggestion.",
         "star": "⭐ Star this project on GitHub", "manual_title": "How to use",
         "manual_body": (
             "1. Add a map: type a name or pick one from Suggestions.\n"
@@ -81,17 +96,19 @@ TR = {
             "3. When the timer reaches zero the card turns green and a sound "
             "plays: the chest is ready again.\n"
             "4. \"Reset\" stops the timer. The ✓ counter shows finished cycles.\n"
-            "5. Everything is saved automatically on your PC.\n\n"
+            "5. Adjust the Volume slider if the sound is too loud.\n"
+            "6. Everything is saved automatically on your PC.\n\n"
             "Tip: set the minutes to your game's chest cooldown (default 12)."
         ),
     },
     "es": {
         "add_map": "+ Agregar mapa", "map_name": "Nombre del mapa",
         "difficulty": "Dificultad", "suggestions": "Sugerencias", "add": "Agregar",
-        "minutes": "Minutos por cofre:", "mute": "Silenciar", "language": "Idioma",
-        "manual": "Manual", "dropped": "Dropeado", "reset": "Reiniciar",
-        "idle": "Sin contar", "counting": "Contando...",
+        "minutes": "Minutos por cofre:", "mute": "Silenciar", "volume": "Volumen",
+        "language": "Idioma", "manual": "Manual", "dropped": "Dropeado",
+        "reset": "Reiniciar", "idle": "Sin contar", "counting": "Contando...",
         "ready_status": "Cofre disponible", "ready": "LISTO",
+        "blue_chest": "Cofre Azul",
         "no_maps": "Todavía no hay mapas.\nAgrega uno arriba o elige una sugerencia.",
         "star": "⭐ Dale una estrella en GitHub", "manual_title": "Cómo usar",
         "manual_body": (
@@ -101,7 +118,8 @@ TR = {
             "el cofre está listo otra vez.\n"
             "4. \"Reiniciar\" detiene el contador. El contador ✓ muestra los "
             "ciclos terminados.\n"
-            "5. Todo se guarda automáticamente en tu PC.\n\n"
+            "5. Ajusta el slider de Volumen si el sonido es muy fuerte.\n"
+            "6. Todo se guarda automáticamente en tu PC.\n\n"
             "Tip: ajusta los minutos al cooldown de cofres de tu juego (por "
             "defecto 12)."
         ),
@@ -109,10 +127,11 @@ TR = {
     "pt": {
         "add_map": "+ Adicionar mapa", "map_name": "Nome do mapa",
         "difficulty": "Dificuldade", "suggestions": "Sugestões", "add": "Adicionar",
-        "minutes": "Minutos por baú:", "mute": "Silenciar", "language": "Idioma",
-        "manual": "Manual", "dropped": "Dropado", "reset": "Reiniciar",
-        "idle": "Sem contar", "counting": "Contando...",
+        "minutes": "Minutos por baú:", "mute": "Silenciar", "volume": "Volume",
+        "language": "Idioma", "manual": "Manual", "dropped": "Dropado",
+        "reset": "Reiniciar", "idle": "Sem contar", "counting": "Contando...",
         "ready_status": "Baú disponível", "ready": "PRONTO",
+        "blue_chest": "Baú Azul",
         "no_maps": "Ainda não há mapas.\nAdicione um acima ou escolha uma sugestão.",
         "star": "⭐ Dê uma estrela no GitHub", "manual_title": "Como usar",
         "manual_body": (
@@ -122,17 +141,19 @@ TR = {
             "o baú está pronto de novo.\n"
             "4. \"Reiniciar\" para o cronômetro. O contador ✓ mostra os ciclos "
             "concluídos.\n"
-            "5. Tudo é salvo automaticamente no seu PC.\n\n"
+            "5. Ajuste o controle de Volume se o som estiver muito alto.\n"
+            "6. Tudo é salvo automaticamente no seu PC.\n\n"
             "Dica: ajuste os minutos ao cooldown de baús do seu jogo (padrão 12)."
         ),
     },
     "fr": {
         "add_map": "+ Ajouter une carte", "map_name": "Nom de la carte",
         "difficulty": "Difficulté", "suggestions": "Suggestions", "add": "Ajouter",
-        "minutes": "Minutes par coffre :", "mute": "Muet", "language": "Langue",
-        "manual": "Manuel", "dropped": "Obtenu", "reset": "Réinitialiser",
-        "idle": "En pause", "counting": "En cours...",
+        "minutes": "Minutes par coffre :", "mute": "Muet", "volume": "Volume",
+        "language": "Langue", "manual": "Manuel", "dropped": "Obtenu",
+        "reset": "Réinitialiser", "idle": "En pause", "counting": "En cours...",
         "ready_status": "Coffre disponible", "ready": "PRÊT",
+        "blue_chest": "Coffre bleu",
         "no_maps": "Aucune carte pour l'instant.\nAjoutez-en une ou choisissez une suggestion.",
         "star": "⭐ Mettez une étoile sur GitHub", "manual_title": "Comment utiliser",
         "manual_body": (
@@ -142,7 +163,8 @@ TR = {
             "retentit : le coffre est de nouveau prêt.\n"
             "4. « Réinitialiser » arrête le minuteur. Le compteur ✓ indique les "
             "cycles terminés.\n"
-            "5. Tout est enregistré automatiquement sur votre PC.\n\n"
+            "5. Réglez le curseur de Volume si le son est trop fort.\n"
+            "6. Tout est enregistré automatiquement sur votre PC.\n\n"
             "Astuce : réglez les minutes selon le délai des coffres de votre jeu (12 par défaut)."
         ),
     },
@@ -150,9 +172,10 @@ TR = {
         "add_map": "+ Karte hinzufügen", "map_name": "Kartenname",
         "difficulty": "Schwierigkeit", "suggestions": "Vorschläge",
         "add": "Hinzufügen", "minutes": "Minuten pro Truhe:", "mute": "Stumm",
-        "language": "Sprache", "manual": "Anleitung", "dropped": "Erhalten",
-        "reset": "Zurücksetzen", "idle": "Nicht aktiv", "counting": "Läuft...",
-        "ready_status": "Truhe verfügbar", "ready": "BEREIT",
+        "volume": "Lautstärke", "language": "Sprache", "manual": "Anleitung",
+        "dropped": "Erhalten", "reset": "Zurücksetzen", "idle": "Nicht aktiv",
+        "counting": "Läuft...", "ready_status": "Truhe verfügbar", "ready": "BEREIT",
+        "blue_chest": "Blaue Truhe",
         "no_maps": "Noch keine Karten.\nFüge oben eine hinzu oder wähle einen Vorschlag.",
         "star": "⭐ Gib dem Projekt einen Stern auf GitHub",
         "manual_title": "Anleitung",
@@ -163,17 +186,19 @@ TR = {
             "ertönt: die Truhe ist wieder bereit.\n"
             "4. „Zurücksetzen“ stoppt den Timer. Der ✓-Zähler zeigt die "
             "abgeschlossenen Zyklen.\n"
-            "5. Alles wird automatisch auf deinem PC gespeichert.\n\n"
+            "5. Stelle den Lautstärke-Regler ein, falls der Ton zu laut ist.\n"
+            "6. Alles wird automatisch auf deinem PC gespeichert.\n\n"
             "Tipp: Stelle die Minuten auf die Truhen-Abklingzeit deines Spiels ein (Standard 12)."
         ),
     },
     "it": {
         "add_map": "+ Aggiungi mappa", "map_name": "Nome mappa",
         "difficulty": "Difficoltà", "suggestions": "Suggerimenti", "add": "Aggiungi",
-        "minutes": "Minuti per forziere:", "mute": "Muto", "language": "Lingua",
-        "manual": "Manuale", "dropped": "Ottenuto", "reset": "Reimposta",
-        "idle": "Fermo", "counting": "Conteggio...",
+        "minutes": "Minuti per forziere:", "mute": "Muto", "volume": "Volume",
+        "language": "Lingua", "manual": "Manuale", "dropped": "Ottenuto",
+        "reset": "Reimposta", "idle": "Fermo", "counting": "Conteggio...",
         "ready_status": "Forziere disponibile", "ready": "PRONTO",
+        "blue_chest": "Forziere blu",
         "no_maps": "Ancora nessuna mappa.\nAggiungine una sopra o scegli un suggerimento.",
         "star": "⭐ Metti una stella su GitHub", "manual_title": "Come usare",
         "manual_body": (
@@ -182,17 +207,19 @@ TR = {
             "3. Quando il timer arriva a zero la scheda diventa verde e suona: "
             "il forziere è di nuovo pronto.\n"
             "4. \"Reimposta\" ferma il timer. Il contatore ✓ mostra i cicli completati.\n"
-            "5. Tutto viene salvato automaticamente sul tuo PC.\n\n"
+            "5. Regola il cursore del Volume se il suono è troppo alto.\n"
+            "6. Tutto viene salvato automaticamente sul tuo PC.\n\n"
             "Consiglio: imposta i minuti in base al cooldown dei forzieri del tuo gioco (default 12)."
         ),
     },
     "ru": {
         "add_map": "+ Добавить карту", "map_name": "Название карты",
         "difficulty": "Сложность", "suggestions": "Предложения", "add": "Добавить",
-        "minutes": "Минут на сундук:", "mute": "Без звука", "language": "Язык",
-        "manual": "Инструкция", "dropped": "Получено", "reset": "Сброс",
-        "idle": "Не считает", "counting": "Идёт отсчёт...",
+        "minutes": "Минут на сундук:", "mute": "Без звука", "volume": "Громкость",
+        "language": "Язык", "manual": "Инструкция", "dropped": "Получено",
+        "reset": "Сброс", "idle": "Не считает", "counting": "Идёт отсчёт...",
         "ready_status": "Сундук доступен", "ready": "ГОТОВО",
+        "blue_chest": "Синий сундук",
         "no_maps": "Пока нет карт.\nДобавьте сверху или выберите предложение.",
         "star": "⭐ Поставьте звезду на GitHub", "manual_title": "Как пользоваться",
         "manual_body": (
@@ -201,16 +228,17 @@ TR = {
             "3. Когда таймер дойдёт до нуля, карточка станет зелёной и прозвучит "
             "сигнал: сундук снова готов.\n"
             "4. «Сброс» останавливает таймер. Счётчик ✓ показывает завершённые циклы.\n"
-            "5. Всё сохраняется автоматически на вашем ПК.\n\n"
+            "5. Отрегулируйте ползунок Громкости, если звук слишком громкий.\n"
+            "6. Всё сохраняется автоматически на вашем ПК.\n\n"
             "Совет: установите минуты под перезарядку сундуков в вашей игре (по умолчанию 12)."
         ),
     },
     "zh": {
         "add_map": "+ 添加关卡", "map_name": "关卡名称", "difficulty": "难度",
         "suggestions": "推荐", "add": "添加", "minutes": "每个宝箱分钟数：",
-        "mute": "静音", "language": "语言", "manual": "使用说明", "dropped": "已掉落",
-        "reset": "重置", "idle": "未计时", "counting": "计时中...",
-        "ready_status": "宝箱可用", "ready": "就绪",
+        "mute": "静音", "volume": "音量", "language": "语言", "manual": "使用说明",
+        "dropped": "已掉落", "reset": "重置", "idle": "未计时", "counting": "计时中...",
+        "ready_status": "宝箱可用", "ready": "就绪", "blue_chest": "蓝色宝箱",
         "no_maps": "还没有关卡。\n在上方添加或选择推荐。",
         "star": "⭐ 在 GitHub 上点星", "manual_title": "使用方法",
         "manual_body": (
@@ -218,17 +246,18 @@ TR = {
             "2. 获得宝箱时按下\"已掉落\"，计时器开始。\n"
             "3. 计时器归零时卡片变绿并响铃：宝箱再次就绪。\n"
             "4. \"重置\"停止计时器。✓ 计数器显示已完成的周期数。\n"
-            "5. 所有数据自动保存在你的电脑上。\n\n"
+            "5. 如果声音太大，请调整音量滑块。\n"
+            "6. 所有数据自动保存在你的电脑上。\n\n"
             "提示：将分钟数设置为游戏中宝箱的冷却时间（默认 12）。"
         ),
     },
     "ja": {
         "add_map": "+ マップを追加", "map_name": "マップ名", "difficulty": "難易度",
         "suggestions": "おすすめ", "add": "追加", "minutes": "宝箱ごとの分:",
-        "mute": "ミュート", "language": "言語", "manual": "使い方",
+        "mute": "ミュート", "volume": "音量", "language": "言語", "manual": "使い方",
         "dropped": "ドロップ", "reset": "リセット", "idle": "停止中",
         "counting": "カウント中...", "ready_status": "宝箱が利用可能",
-        "ready": "準備完了",
+        "ready": "準備完了", "blue_chest": "青い宝箱",
         "no_maps": "まだマップがありません。\n上で追加するか、おすすめから選んでください。",
         "star": "⭐ GitHub でスターを付ける", "manual_title": "使い方",
         "manual_body": (
@@ -236,17 +265,18 @@ TR = {
             "2. 宝箱を入手したら「ドロップ」を押すとタイマーが始まります。\n"
             "3. タイマーがゼロになるとカードが緑になり音が鳴ります：宝箱が再び準備完了です。\n"
             "4. 「リセット」でタイマーを止めます。✓ カウンターは完了した回数を表示します。\n"
-            "5. すべて自動的にあなたのPCに保存されます。\n\n"
+            "5. 音が大きすぎる場合は音量スライダーを調整してください。\n"
+            "6. すべて自動的にあなたのPCに保存されます。\n\n"
             "ヒント：分をゲームの宝箱クールダウンに合わせて設定してください（デフォルト12）。"
         ),
     },
     "ko": {
         "add_map": "+ 맵 추가", "map_name": "맵 이름", "difficulty": "난이도",
         "suggestions": "추천", "add": "추가", "minutes": "상자당 분:",
-        "mute": "음소거", "language": "언어", "manual": "사용법",
+        "mute": "음소거", "volume": "볼륨", "language": "언어", "manual": "사용법",
         "dropped": "드롭됨", "reset": "초기화", "idle": "대기 중",
         "counting": "카운트 중...", "ready_status": "상자 사용 가능",
-        "ready": "준비됨",
+        "ready": "준비됨", "blue_chest": "파란 상자",
         "no_maps": "아직 맵이 없습니다.\n위에서 추가하거나 추천을 선택하세요.",
         "star": "⭐ GitHub에서 별 주기", "manual_title": "사용법",
         "manual_body": (
@@ -254,7 +284,8 @@ TR = {
             "2. 상자를 얻으면 \"드롭됨\"을 누르면 타이머가 시작됩니다.\n"
             "3. 타이머가 0이 되면 카드가 녹색으로 변하고 소리가 납니다: 상자가 다시 준비됩니다.\n"
             "4. \"초기화\"는 타이머를 멈춥니다. ✓ 카운터는 완료된 횟수를 표시합니다.\n"
-            "5. 모든 것은 자동으로 PC에 저장됩니다.\n\n"
+            "5. 소리가 너무 크면 볼륨 슬라이더를 조절하세요.\n"
+            "6. 모든 것은 자동으로 PC에 저장됩니다.\n\n"
             "팁: 분을 게임의 상자 쿨다운에 맞게 설정하세요 (기본 12)."
         ),
     },
@@ -295,8 +326,9 @@ def default_lang():
 DEFAULT_CONFIG = {
     "minutes": 12,
     "muted": False,
+    "volume": 70,
     "lang": default_lang(),
-    "maps": [],  # [{"name","chest","difficulty","next_ready","completed"}]
+    "maps": [],  # [{"name","chest_lv","difficulty","next_ready","completed"}]
 }
 
 
@@ -317,14 +349,52 @@ def fmt_time(seconds):
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
 
 
-def play_ready_sound(muted):
-    if muted or not HAS_SOUND:
+# ------------------------------------------------------------- Sonido
+_SOUND_CACHE = {}
+
+
+def _build_sound(volume):
+    """Genera un WAV en memoria (4 tonos ascendentes) escalado por volumen."""
+    rate = 22050
+    amp = int(32767 * max(0.0, min(1.0, volume)))
+    tones = [(700, 0.16), (900, 0.16), (1100, 0.16), (1400, 0.20)]
+    fade = int(rate * 0.005)
+    frames = bytearray()
+    for freq, dur in tones:
+        n = int(rate * dur)
+        for i in range(n):
+            env = 1.0
+            if i < fade:
+                env = i / fade
+            elif i > n - fade:
+                env = max(0.0, (n - i) / fade)
+            val = int(amp * env * math.sin(2 * math.pi * freq * i / rate))
+            frames += struct.pack("<h", val)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        wav.writeframes(bytes(frames))
+    return buf.getvalue()
+
+
+def get_sound(volume):
+    key = round(volume, 2)
+    if key not in _SOUND_CACHE:
+        _SOUND_CACHE[key] = _build_sound(volume)
+    return _SOUND_CACHE[key]
+
+
+def play_ready_sound(volume):
+    """volume: 0.0 .. 1.0. Reproduce sin bloquear (async)."""
+    if volume <= 0 or not HAS_SOUND:
         return
 
     def run():
         try:
-            for freq in (700, 900, 1100, 1400):
-                winsound.Beep(freq, 180)
+            winsound.PlaySound(get_sound(volume),
+                               winsound.SND_MEMORY | winsound.SND_ASYNC)
         except Exception:  # noqa: BLE001
             try:
                 winsound.MessageBeep()
@@ -338,17 +408,22 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title(APP_TITLE)
-        self.root.geometry("500x740")
-        self.root.minsize(470, 560)
+        self.root.geometry("500x760")
+        self.root.minsize(470, 580)
         self.root.configure(bg=ROOT_BG)
+        self._set_icon()
 
         self.cfg = load_config()
         self.lang = self.cfg.get("lang", default_lang())
         self.maps = []
         for m in self.cfg.get("maps", []):
+            lv = m.get("chest_lv")
+            if not lv:  # migracion desde la version vieja (campo "chest")
+                mt = re.search(r"Lv\s*\d+", m.get("chest", ""))
+                lv = mt.group(0).replace(" ", "") if mt else ""
             self.maps.append({
                 "name": m.get("name", "Map"),
-                "chest": m.get("chest", ""),
+                "chest_lv": lv,
                 "difficulty": m.get("difficulty", ""),
                 "next_ready": m.get("next_ready"),
                 "completed": m.get("completed", 0),
@@ -358,6 +433,7 @@ class App:
 
         self.minutes_var = tk.IntVar(value=self.cfg.get("minutes", 12))
         self.muted_var = tk.BooleanVar(value=self.cfg.get("muted", False))
+        self.volume_var = tk.DoubleVar(value=self.cfg.get("volume", 70))
         self.map_name_var = tk.StringVar()
         self.diff_var = tk.StringVar(value="Normal")
         self.suggestion_var = tk.StringVar()
@@ -371,6 +447,13 @@ class App:
 
     def t(self, key):
         return TR.get(self.lang, TR["en"]).get(key, TR["en"].get(key, key))
+
+    def _set_icon(self):
+        try:
+            self._icon_img = tk.PhotoImage(file=resource_path(ICON_FILE))
+            self.root.iconphoto(True, self._icon_img)
+        except Exception:  # noqa: BLE001
+            pass
 
     # --------------------------------------------------------- Estilo
     def _init_style(self):
@@ -389,23 +472,38 @@ class App:
         style.map("TCheckbutton", background=[("active", ROOT_BG)])
         style.configure("Add.TButton", font=("Segoe UI", 10, "bold"), padding=6)
         style.configure("TCombobox", padding=3)
+        style.configure("Horizontal.TScale", background=ROOT_BG)
 
     # ------------------------------------------------------------ UI
     def _build_ui(self):
-        # --- Header: titulo + idioma + mute + manual
+        # --- Header: titulo + manual
         header = ttk.Frame(self.root)
         header.pack(fill="x", padx=14, pady=(12, 4))
         ttk.Label(header, text=APP_TITLE, style="Header.TLabel").pack(side="left")
-
         self.manual_btn = ttk.Button(header, text=self.t("manual"), width=9,
                                      command=self.show_manual)
         self.manual_btn.pack(side="right")
-        self.mute_chk = ttk.Checkbutton(
-            header, text=self.t("mute"), variable=self.muted_var,
-            command=self.save_config)
-        self.mute_chk.pack(side="right", padx=8)
 
-        # --- Idioma
+        # --- Sonido: mute + volumen + test
+        snd_row = ttk.Frame(self.root)
+        snd_row.pack(fill="x", padx=14, pady=2)
+        self.mute_chk = ttk.Checkbutton(
+            snd_row, text=self.t("mute"), variable=self.muted_var,
+            command=self.save_config)
+        self.mute_chk.pack(side="left")
+        self.vol_lbl = ttk.Label(snd_row, text=self.t("volume"), style="Dim.TLabel")
+        self.vol_lbl.pack(side="left", padx=(14, 4))
+        ttk.Scale(snd_row, from_=0, to=100, variable=self.volume_var,
+                  command=self.on_volume_change).pack(side="left", fill="x",
+                                                      expand=True, padx=4)
+        self.vol_pct = ttk.Label(snd_row, text=f"{int(self.volume_var.get())}%",
+                                 style="Dim.TLabel", width=4)
+        self.vol_pct.pack(side="left")
+        tk.Button(snd_row, text="▶", relief="flat", cursor="hand2", bg="#44445a",
+                  fg=TEXT_MAIN, activebackground="#55556e", width=3,
+                  command=self.test_sound).pack(side="left", padx=(4, 0))
+
+        # --- Idioma + minutos
         lang_row = ttk.Frame(self.root)
         lang_row.pack(fill="x", padx=14, pady=2)
         self.lang_lbl = ttk.Label(lang_row, text=self.t("language"),
@@ -416,7 +514,6 @@ class App:
             values=[name for _, name in LANGS])
         lang_combo.pack(side="left", padx=6)
         lang_combo.bind("<<ComboboxSelected>>", self.on_lang_change)
-
         self.minutes_lbl = ttk.Label(lang_row, text=self.t("minutes"),
                                      style="Dim.TLabel")
         self.minutes_lbl.pack(side="left", padx=(14, 4))
@@ -449,7 +546,7 @@ class App:
         self.sugg_lbl.pack(side="left")
         self.sugg_combo = ttk.Combobox(
             sugg_row, textvariable=self.suggestion_var, state="readonly",
-            values=[f"{s}   ·   {c}   ·   {d}" for s, c, d in SUGGESTIONS])
+            values=self._suggestion_values())
         self.sugg_combo.pack(side="left", fill="x", expand=True, padx=6)
         self.add_sugg_btn = ttk.Button(sugg_row, text=self.t("add"),
                                       command=self.add_suggestion)
@@ -482,8 +579,20 @@ class App:
         self.footer_link.pack(pady=(0, 10))
         self.footer_link.bind("<Button-1>", lambda e: webbrowser.open(GITHUB_URL))
 
+    def _suggestion_values(self):
+        return [f"{stage}   ·   {self.t('blue_chest')} {lv}   ·   {diff}"
+                for stage, lv, diff in SUGGESTIONS]
+
     def _on_wheel(self, event):
         self.canvas.yview_scroll(int(-event.delta / 120), "units")
+
+    # ------------------------------------------------------- Sonido UI
+    def on_volume_change(self, _value=None):
+        self.vol_pct.config(text=f"{int(self.volume_var.get())}%")
+        self.save_config()
+
+    def test_sound(self):
+        play_ready_sound(self.volume_var.get() / 100.0)
 
     # ------------------------------------------------------ Idioma
     def on_lang_change(self, _event=None):
@@ -498,19 +607,24 @@ class App:
     def apply_language(self):
         self.manual_btn.config(text=self.t("manual"))
         self.mute_chk.config(text=self.t("mute"))
+        self.vol_lbl.config(text=self.t("volume"))
         self.lang_lbl.config(text=self.t("language"))
         self.minutes_lbl.config(text=self.t("minutes"))
         self.add_btn.config(text=self.t("add_map"))
         self.sugg_lbl.config(text=self.t("suggestions"))
         self.add_sugg_btn.config(text=self.t("add"))
         self.footer_link.config(text=self.t("star"))
+        idx = self.sugg_combo.current()
+        self.sugg_combo.config(values=self._suggestion_values())
+        if idx >= 0:
+            self.sugg_combo.current(idx)
         self.render_maps()
 
     # ------------------------------------------------------- Manual
     def show_manual(self):
         win = tk.Toplevel(self.root)
         win.title(self.t("manual_title"))
-        win.geometry("520x420")
+        win.geometry("520x440")
         win.configure(bg=ROOT_BG)
         tk.Label(win, text=self.t("manual_title"), bg=ROOT_BG, fg=TEXT_MAIN,
                  font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=16, pady=12)
@@ -536,14 +650,14 @@ class App:
         idx = self.sugg_combo.current()
         if idx < 0:
             return
-        stage, chest, diff = SUGGESTIONS[idx]
+        stage, lv, diff = SUGGESTIONS[idx]
         if any(m["name"] == stage for m in self.maps):
             return  # evita duplicados
-        self._append_map(stage, chest, diff)
+        self._append_map(stage, lv, diff)
 
-    def _append_map(self, name, chest, difficulty):
+    def _append_map(self, name, chest_lv, difficulty):
         self.maps.append({
-            "name": name, "chest": chest, "difficulty": difficulty,
+            "name": name, "chest_lv": chest_lv, "difficulty": difficulty,
             "next_ready": None, "completed": 0, "_w": None, "_fired": False,
         })
         self.render_maps()
@@ -600,9 +714,10 @@ class App:
             done_lbl.pack(side="right", padx=10)
 
             chest_lbl = None
-            if m["chest"]:
-                chest_lbl = tk.Label(card, text=m["chest"], bg=CARD_IDLE,
-                                     fg=TEXT_DIM, font=("Segoe UI", 8))
+            if m["chest_lv"]:
+                chest_lbl = tk.Label(card, text=f"{self.t('blue_chest')} {m['chest_lv']}",
+                                     bg=CARD_IDLE, fg=TEXT_DIM,
+                                     font=("Segoe UI", 8))
                 chest_lbl.pack(anchor="w", padx=12)
 
             time_lbl = tk.Label(card, text="--:--", bg=CARD_IDLE, fg=TEXT_DIM,
@@ -665,7 +780,8 @@ class App:
                         m["_fired"] = True
                         m["completed"] += 1
                         w["done"].config(text=f"✓ {m['completed']}")
-                        play_ready_sound(self.muted_var.get())
+                        if not self.muted_var.get():
+                            play_ready_sound(self.volume_var.get() / 100.0)
                         self.save_config()
                         self._flash(m)
                 else:
@@ -691,9 +807,10 @@ class App:
     def save_config(self):
         self.cfg["minutes"] = self.minutes_var.get()
         self.cfg["muted"] = bool(self.muted_var.get())
+        self.cfg["volume"] = int(self.volume_var.get())
         self.cfg["lang"] = self.lang
         self.cfg["maps"] = [
-            {"name": m["name"], "chest": m["chest"],
+            {"name": m["name"], "chest_lv": m["chest_lv"],
              "difficulty": m["difficulty"], "next_ready": m["next_ready"],
              "completed": m["completed"]}
             for m in self.maps
