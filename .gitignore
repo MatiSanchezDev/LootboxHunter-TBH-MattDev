@@ -5,6 +5,9 @@ dist_onedir/
 *.spec
 *.zip
 
+# Binarios: se distribuyen via GitHub Releases, no en el repo
+/LootboxHunter.exe
+
 # Python
 __pycache__/
 *.pyc

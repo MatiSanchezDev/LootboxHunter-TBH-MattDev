@@ -12,40 +12,64 @@ so you always know which map is ready next.
 
 ## ⬇️ Download (just the app)
 
-**[➡️ CLICK HERE TO DOWNLOAD LootboxHunter.exe ⬅️](https://github.com/MatiSanchezDev/LootboxHunter-TBH-MattDev/raw/main/LootboxHunter.exe)**
+**[➡️ CLICK HERE TO DOWNLOAD (portable .zip) ⬅️](https://github.com/MatiSanchezDev/LootboxHunter-TBH-MattDev/releases/latest/download/LootboxHunter-portable.zip)**
 
-That single link downloads the app directly. Then **double-click it** — no
-installation, no Python, nothing else to set up. (Windows only.)
+Then:
 
-Prefer fewer antivirus warnings? Grab **`LootboxHunter-portable.zip`** from the
-[Releases](../../releases) page, unzip it, and run `LootboxHunter.exe` inside.
+1. **Unzip** the downloaded file anywhere (right-click → Extract All).
+2. Open the `LootboxHunter` folder and **double-click `LootboxHunter.exe`**.
+
+No installation, no Python. (Windows only.) This `.zip` is the **recommended**
+download because it triggers fewer antivirus false positives than a single
+`.exe` (see [Is it safe?](#-is-it-safe-antivirus-false-positives) below).
+
+> Prefer a single file (one click, but more antivirus noise)? Download
+> [`LootboxHunter.exe`](https://github.com/MatiSanchezDev/LootboxHunter-TBH-MattDev/releases/latest/download/LootboxHunter.exe).
 
 ⭐ If this saves you time, please **star the repo** — it really helps!
 
-## 🛡️ Is it safe? (antivirus false positive)
+## 🛡️ Is it safe? (antivirus false positives)
 
 **Yes.** Some antivirus engines may flag the `.exe` as a generic
-"Trojan"/"Wacatac"/"ML.Heuristic". This is a **known false positive for apps
-built with PyInstaller** — not actual malware.
+"Trojan"/"Wacatac"/"ML.Heuristic", and VirusTotal's sandbox may match a few
+behavioral rules. These are **known false positives for any app built with
+PyInstaller** (the tool that turns Python into a `.exe`) — not actual malware.
+On VirusTotal the **CRITICAL count is 0**.
 
-Why it happens:
+### Why heuristics flag it
 
 - A `--onefile` PyInstaller app bundles the Python runtime and **unpacks itself
   to a temp folder at launch**. Packed malware does the same thing, so heuristic
-  scanners flag the *pattern*, not real malicious code.
+  scanners flag the *pattern*, not real malicious code. (The **portable .zip**
+  build does **not** self-extract, which is why it's the recommended download.)
 - The executable is **unsigned** (no paid code-signing certificate) and brand
   new, so it has zero reputation.
 
-How you can verify it yourself:
+### The VirusTotal "Sigma rules", explained
+
+Sigma rules describe *behaviors observed while running the file*, not malware
+verdicts. Every rule this app matches is a normal consequence of being a
+Python-app-in-an-`.exe`:
+
+| Rule | What it flags | Why it's harmless here |
+|------|---------------|------------------------|
+| **Vcruntime140 DLL Sideloading** | Loading `vcruntime140.dll` from a local folder | PyInstaller ships the Visual C++ runtime Python needs. Every packaged Python app does this — hence "*Potential*". |
+| **Sysmon File Executable Creation** | An executable file written to disk | The `--onefile` self-extraction to `%TEMP%`. **Avoided entirely by the portable .zip.** |
+| **New Root/CA Certificate to Store** | A certificate added to Windows | **Not done by this app** — the code never imports `ssl`/`winreg` or touches the certificate store. Ambient sandbox noise. |
+| **Python Image Load By Non-Python Process** | A non-`python.exe` process loading "Python Core" | Literally describes PyInstaller/Py2Exe/cx_Freeze bundling. This *confirms* it's a packaged Python app. |
+
+None of these indicate the code steals data, contacts a server, or harms your
+PC.
+
+### Verify it yourself
 
 - **The full source is in this repo** — read every line. The app only uses the
   Python standard library. No `requests`, no `socket`, no `subprocess`, no
-  remote code. It only opens this GitHub page in your browser (the ⭐ link) and
-  saves settings to `%APPDATA%\CofreTracker\config.json`.
-- **Run it from source** with `python cofre_tracker.py` — no `.exe` at all.
+  `ssl`, no `winreg`, no remote code. It only opens this GitHub page in your
+  browser (the ⭐ link) and saves settings to `%APPDATA%\CofreTracker\config.json`.
+- **Run it from source** with `python cofre_tracker.py` — no `.exe`, no
+  packaging, none of the behaviors above.
 - **Build it yourself** (see below) and you'll get the same harmless file.
-- Prefer the **portable .zip** (`--onedir` build), which doesn't self-extract and
-  usually triggers fewer warnings.
 
 ---
 
@@ -64,13 +88,13 @@ How you can verify it yourself:
 
 ## 🚀 Install & Run
 
-### Option A — Download the .exe (recommended, no Python needed)
+### Option A — Download the app (recommended, no Python needed)
 
-Grab the ready-to-run executable, **double-click it, done**. Two ways:
-
-- Download [**`LootboxHunter.exe`**](LootboxHunter.exe) straight from this repo
-  (click the file, then the download button), **or**
-- Get it from the [**Releases**](../../releases) page.
+- **Recommended:** download the [**portable .zip**](https://github.com/MatiSanchezDev/LootboxHunter-TBH-MattDev/releases/latest/download/LootboxHunter-portable.zip),
+  unzip it, and run `LootboxHunter.exe` inside the folder. Fewer antivirus
+  false positives (see [Is it safe?](#-is-it-safe-antivirus-false-positives)).
+- **Single file:** download [`LootboxHunter.exe`](https://github.com/MatiSanchezDev/LootboxHunter-TBH-MattDev/releases/latest/download/LootboxHunter.exe)
+  for one-click use (but more antivirus noise).
 
 No installation, no Python required.
 
