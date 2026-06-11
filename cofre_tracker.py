@@ -689,12 +689,12 @@ class App:
 
         for m in self.maps:
             card = tk.Frame(self.inner, bg=CARD_IDLE)
-            card.pack(fill="x", pady=5, padx=4)
+            card.pack(fill="x", pady=3, padx=4)
 
             top = tk.Frame(card, bg=CARD_IDLE)
-            top.pack(fill="x", padx=12, pady=(10, 0))
+            top.pack(fill="x", padx=10, pady=(5, 0))
             name_lbl = tk.Label(top, text=m["name"], bg=CARD_IDLE, fg=TEXT_MAIN,
-                                font=("Segoe UI", 12, "bold"), anchor="w")
+                                font=("Segoe UI", 11, "bold"), anchor="w")
             name_lbl.pack(side="left")
 
             badge = None
@@ -703,50 +703,46 @@ class App:
                     top, text=f" {m['difficulty']} ",
                     bg=DIFFICULTY_COLORS[m["difficulty"]], fg="white",
                     font=("Segoe UI", 8, "bold"))
-                badge.pack(side="left", padx=8)
+                badge.pack(side="left", padx=6)
 
             del_btn = tk.Label(top, text="✕", bg=CARD_IDLE, fg=TEXT_DIM,
-                               font=("Segoe UI", 11), cursor="hand2")
+                               font=("Segoe UI", 10), cursor="hand2")
             del_btn.pack(side="right")
             del_btn.bind("<Button-1>", lambda e, mm=m: self.remove_map(mm))
             done_lbl = tk.Label(top, text=f"✓ {m['completed']}", bg=CARD_IDLE,
-                                fg=GOLD, font=("Segoe UI", 10, "bold"))
-            done_lbl.pack(side="right", padx=10)
+                                fg=GOLD, font=("Segoe UI", 9, "bold"))
+            done_lbl.pack(side="right", padx=8)
 
             chest_lbl = None
             if m["chest_lv"]:
-                chest_lbl = tk.Label(card, text=f"{self.t('blue_chest')} {m['chest_lv']}",
-                                     bg=CARD_IDLE, fg=TEXT_DIM,
-                                     font=("Segoe UI", 8))
-                chest_lbl.pack(anchor="w", padx=12)
+                chest_lbl = tk.Label(
+                    top, text=f"·  {self.t('blue_chest')} {m['chest_lv']}",
+                    bg=CARD_IDLE, fg=TEXT_DIM, font=("Segoe UI", 8))
+                chest_lbl.pack(side="left", padx=6)
 
-            time_lbl = tk.Label(card, text="--:--", bg=CARD_IDLE, fg=TEXT_DIM,
-                                font=("Consolas", 30, "bold"))
-            time_lbl.pack(pady=(2, 0))
-            status_lbl = tk.Label(card, text=self.t("idle"), bg=CARD_IDLE,
-                                  fg=TEXT_DIM, font=("Segoe UI", 9))
-            status_lbl.pack()
-
-            btns = tk.Frame(card, bg=CARD_IDLE)
-            btns.pack(fill="x", padx=12, pady=(6, 12))
-            tk.Button(btns, text=self.t("dropped"), relief="flat", cursor="hand2",
+            bottom = tk.Frame(card, bg=CARD_IDLE)
+            bottom.pack(fill="x", padx=10, pady=(2, 6))
+            time_lbl = tk.Label(bottom, text="--:--", bg=CARD_IDLE, fg=TEXT_DIM,
+                                font=("Consolas", 17, "bold"), width=6, anchor="w")
+            time_lbl.pack(side="left")
+            tk.Button(bottom, text=self.t("dropped"), relief="flat", cursor="hand2",
                       bg="#3a6df0", fg="white", activebackground="#2f5bd0",
-                      activeforeground="white", font=("Segoe UI", 10, "bold"),
+                      activeforeground="white", font=("Segoe UI", 9, "bold"),
                       command=lambda mm=m: self.drop_map(mm)).pack(
-                          side="left", fill="x", expand=True, ipady=4, padx=(0, 4))
-            tk.Button(btns, text=self.t("reset"), relief="flat", cursor="hand2",
+                          side="left", fill="x", expand=True, ipady=2, padx=(4, 4))
+            tk.Button(bottom, text=self.t("reset"), relief="flat", cursor="hand2",
                       bg="#44445a", fg=TEXT_MAIN, activebackground="#55556e",
-                      activeforeground="white", font=("Segoe UI", 10),
+                      activeforeground="white", font=("Segoe UI", 9),
                       command=lambda mm=m: self.reset_map(mm)).pack(
-                          side="left", ipady=4, padx=(4, 0))
+                          side="left", ipady=2)
 
             m["_w"] = {
-                "card": card, "top": top, "btns": btns, "name": name_lbl,
+                "card": card, "top": top, "btns": bottom, "name": name_lbl,
                 "badge": badge, "chest": chest_lbl, "done": done_lbl,
-                "time": time_lbl, "status": status_lbl, "del": del_btn,
+                "time": time_lbl, "del": del_btn,
             }
 
-    def _paint(self, m, bg, time_fg, status_text, status_fg):
+    def _paint(self, m, bg, time_fg):
         w = m["_w"]
         if not w:
             return
@@ -758,7 +754,6 @@ class App:
         if w["chest"]:
             w["chest"].config(bg=bg)
         w["time"].config(bg=bg, fg=time_fg)
-        w["status"].config(bg=bg, fg=status_fg, text=status_text)
 
     def tick(self):
         now = time.time()
@@ -770,12 +765,12 @@ class App:
             nr = m["next_ready"]
             if nr is None:
                 w["time"].config(text="--:--")
-                self._paint(m, CARD_IDLE, TEXT_DIM, self.t("idle"), TEXT_DIM)
+                self._paint(m, CARD_IDLE, TEXT_DIM)
             else:
                 rem = nr - now
                 if rem <= 0:
                     w["time"].config(text=self.t("ready"))
-                    self._paint(m, CARD_READY, GREEN, self.t("ready_status"), GREEN)
+                    self._paint(m, CARD_READY, GREEN)
                     if not m["_fired"]:
                         m["_fired"] = True
                         m["completed"] += 1
@@ -786,7 +781,7 @@ class App:
                         self._flash(m)
                 else:
                     w["time"].config(text=fmt_time(rem))
-                    self._paint(m, CARD_RUNNING, AMBER, self.t("counting"), AMBER)
+                    self._paint(m, CARD_RUNNING, AMBER)
         self.root.after(250, self.tick)
 
     def _flash(self, m, count=6):
@@ -797,7 +792,7 @@ class App:
         nxt = "#2f6b3f" if cur == CARD_READY else CARD_READY
         for key in ("card", "top", "btns"):
             w[key].config(bg=nxt)
-        for key in ("name", "del", "done", "time", "status"):
+        for key in ("name", "del", "done", "time"):
             w[key].config(bg=nxt)
         if w["chest"]:
             w["chest"].config(bg=nxt)
