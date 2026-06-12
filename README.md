@@ -19,6 +19,13 @@ Then:
 1. **Unzip** the downloaded file anywhere (right-click → Extract All).
 2. Open the `LootboxHunter` folder and **double-click `LootboxHunter.exe`**.
 
+> ⚠️ **Keep `LootboxHunter.exe` inside its folder, next to the `_internal`
+> folder.** Don't move or copy the `.exe` out on its own — it won't run without
+> `_internal`. To launch it from elsewhere (desktop, Steam, etc.), right-click
+> the `.exe` → **Create shortcut** and move the *shortcut*, not the file. (See
+> [Troubleshooting](#-troubleshooting) if you get a "Could not load PyInstaller's
+> embedded PKG archive" error.)
+
 No installation, no Python. (Windows only.) This `.zip` is the **recommended**
 download because it triggers fewer antivirus false positives than a single
 `.exe` (see [Is it safe?](#-is-it-safe-antivirus-false-positives) below).
@@ -125,6 +132,32 @@ python -m PyInstaller --onedir --windowed --name LootboxHunter --icon icono.ico 
 Translations live in the `TR` dictionary inside `cofre_tracker.py`. Copy an
 existing language block, translate the strings, add your code to `LANGS`, and
 open a Pull Request. Contributions welcome!
+
+---
+
+## 🩹 Troubleshooting
+
+### "Could not load PyInstaller's embedded PKG archive from the executable"
+
+This means the app's `LootboxHunter.exe` got **separated from its `_internal`
+folder**, or the file was downloaded/copied incompletely. The folder build keeps
+the program data in `_internal` right next to the `.exe`, and the `.exe` cannot
+start without it.
+
+**Fix:**
+
+1. Delete the lone `LootboxHunter.exe` you copied somewhere (e.g. into a Steam
+   folder).
+2. Re-download the [**portable .zip**](https://github.com/MatiSanchezDev/LootboxHunter-TBH-MattDev/releases/latest/download/LootboxHunter-portable.zip)
+   and **Extract All** so you get the whole `LootboxHunter` folder.
+3. Run `LootboxHunter.exe` **from inside that folder** — keep it next to
+   `_internal`. To launch it from your desktop or Steam, right-click the `.exe`
+   → **Create shortcut** and move the *shortcut*, not the `.exe`.
+
+Prefer something you can drop anywhere? Use the single-file
+[`LootboxHunter.exe`](https://github.com/MatiSanchezDev/LootboxHunter-TBH-MattDev/releases/latest/download/LootboxHunter.exe)
+(11 MB) — it's self-contained and can't be broken by moving it (just expect more
+antivirus noise; see [Is it safe?](#-is-it-safe-antivirus-false-positives)).
 
 ---
 
